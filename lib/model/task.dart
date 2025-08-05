@@ -31,7 +31,7 @@ class Task {
       'endTime': endTime.toIso8601String(),
       'reminder': reminder.toIso8601String(),
       'status': status,
-      'projectId': projectId,
+      //'projectId': projectId,
     };
   }
 
@@ -43,7 +43,7 @@ class Task {
       endTime: DateTime.parse(map['endTime']),
       reminder: DateTime.parse(map['reminder']),
       status: map['status'],
-      projectId: map['projectId'],
+      //projectId: map['projectId'],
     );
   }
 }
