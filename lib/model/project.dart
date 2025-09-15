@@ -3,13 +3,13 @@ import 'package:uuid/uuid.dart';
 class Project {
   Project({
     String? projectId,
-    this.projectName,
+    String? projectName,
     this.status,
-  }) : projectId = projectId ?? const Uuid().v4();
+  }) : projectId = projectId ?? const Uuid().v4(), projectName = projectName ?? "default";
 
   String projectId;
-  String? projectName;
-  int? status;
+  String projectName;
+  int? status = 0;
 
   // Convert Project instance to Map (for SQLite or JSON)
   Map<String, dynamic> toMap() {

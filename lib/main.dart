@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:my_app/notification/notifications.dart';
 import 'package:my_app/screens/daily_screen.dart';
 
 
 void main() {
+
+  WidgetsFlutterBinding.ensureInitialized();
+  Notifications().init();
+
   runApp(const MyApp());
 }
 

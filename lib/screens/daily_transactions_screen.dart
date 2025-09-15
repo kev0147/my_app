@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:my_app/database/database.dart';
+import 'package:my_app/model/project.dart';
 import 'package:my_app/model/transaction.dart' as money;
 import 'package:my_app/screens/daily_screen.dart';
 
@@ -14,16 +15,16 @@ class TransactionScreen extends StatefulWidget {
 
 class _TransactionScreenState extends State<TransactionScreen> {
   final dbHelper = DatabaseHelper();
-  final TextEditingController _reasonController = TextEditingController();
-  final TextEditingController _amountController = TextEditingController();
 
   List<money.Transaction> _transactions = [];
   List<money.Transaction> _allTransactions = [];
+  List<Project> _projects = [];
 
   @override
   void initState() {
     super.initState();
     _loadTransactions();
+    _loadProjects();
   }
 
   Future<void> _loadTransactions() async {
@@ -33,6 +34,11 @@ class _TransactionScreenState extends State<TransactionScreen> {
       _transactions = txs;
       _allTransactions = allTxs;
     });
+  }
+
+  Future<void> _loadProjects() async {
+    final projects = await dbHelper.getAllProjects();
+    setState(() => _projects = projects);
   }
 
   moneyFormPage(
@@ -45,6 +51,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
           function: function,
           date: widget.date,
           adding: adding,
+          projects: _projects,
         ),
       ),
     );
@@ -52,6 +59,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
 
   _addTransaction(money.Transaction tx) {
     dbHelper.insertTransaction(tx);
+    _loadTransactions();
   }
 
   int getPoint(List<money.Transaction> list) {
@@ -72,8 +80,30 @@ class _TransactionScreenState extends State<TransactionScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Transactions')),
-      body: Column(
+      body: 
+      Column(
         children: [
+                    Column(
+            children: [
+              Row(
+                children: [
+                  Text('You have spent ${getPoint(_transactions)}'),
+                  getPoint(_transactions) >= 2000
+                      ? const Text('its a lot for you. stupid bastard')
+                      : const Text('lol'),
+                ],
+              ),
+              Row(
+                children: [
+                  Text('the hole money left is ${getPoint(_allTransactions)}'),
+                  getPoint(_allTransactions) >= 20000
+                      ? const Text(
+                          'you are going to be broke. very soon. stupid bastard')
+                      : const Text('lol'),
+                ],
+              )
+            ],
+          ),
           Expanded(
             child: _transactions.isEmpty
                 ? const Center(child: Text('No transactions yet.'))
@@ -101,16 +131,6 @@ class _TransactionScreenState extends State<TransactionScreen> {
                     },
                   ),
           ),
-          Column(
-            children: [
-              Row(
-                children: [Text('You have spent ${getPoint(_transactions)}'),
-              getPoint(_transactions) >= 2000 ? const Text('its a lot for you. stupid bastard'):const Text('lol'),],
-              ),
-              Row(children: [Text('the hole money left is ${getPoint(_allTransactions)}'),
-              getPoint(_allTransactions) >= 20000 ? const Text('you are going to be broke. very soon. stupid bastard'):const Text('lol'),],)
-            ],
-          )
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -125,6 +145,7 @@ class MoneyForm extends StatefulWidget {
   final DatabaseHelper dbHelper;
   final Function(money.Transaction) function;
   final money.Transaction transaction;
+  final List<Project> projects;
   final DateTime date;
   final bool adding;
   MoneyForm(
@@ -133,6 +154,7 @@ class MoneyForm extends StatefulWidget {
       required this.function,
       required this.date,
       required this.adding,
+      required this.projects,
       money.Transaction? transaction})
       : transaction = transaction ?? money.Transaction();
 
@@ -144,12 +166,19 @@ class _MoneyFormState extends State<MoneyForm> {
   final TextEditingController _reasonController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
 
+  String? selectedValue;
+  List<String> options = [];
+
   @override
   void initState() {
     super.initState();
     if (widget.adding) {
       _reasonController.text = widget.transaction.transactionReason;
       _amountController.text = widget.transaction.amount.toString();
+    }
+
+    for (var project in widget.projects) {
+      options.add(project.projectName);
     }
   }
 
@@ -162,7 +191,17 @@ class _MoneyFormState extends State<MoneyForm> {
     final amount = int.tryParse(amountText);
     if (amount == null) return;
 
-    final tx = money.Transaction(transactionReason: reason, amount: amount);
+    Project selectedProject = Project(projectId: "default");
+    for (var option in options) {
+      if (selectedValue == option) {
+        selectedProject = widget.projects[options.indexOf(option)];
+      }
+    }
+
+    final tx = money.Transaction(
+        transactionReason: reason,
+        amount: amount,
+        projectId: selectedProject.projectId);
     widget.function(tx);
 
     _reasonController.clear();
@@ -184,10 +223,19 @@ class _MoneyFormState extends State<MoneyForm> {
     final amount = int.tryParse(amountText);
     if (amount == null) return;
 
+    Project selectedProject = Project(projectId: "default");
+    for (var option in options) {
+      if (selectedValue == option) {
+        selectedProject = widget.projects[options.indexOf(option)];
+      }
+    }
+
     final tx = money.Transaction(
-        transactionId: widget.transaction.transactionId,
-        transactionReason: reason,
-        amount: amount);
+      transactionId: widget.transaction.transactionId,
+      transactionReason: reason,
+      amount: amount,
+      projectId: selectedProject.projectId,
+    );
     widget.function(tx);
 
     _reasonController.clear();
@@ -227,6 +275,21 @@ class _MoneyFormState extends State<MoneyForm> {
           controller: _amountController,
           keyboardType: TextInputType.number,
           decoration: const InputDecoration(labelText: 'Amount'),
+        ),
+        DropdownButton<String>(
+          hint: const Text('Choose'),
+          value: selectedValue,
+          onChanged: (newValue) {
+            setState(() {
+              selectedValue = newValue;
+            });
+          },
+          items: options.map((option) {
+            return DropdownMenuItem<String>(
+              value: option,
+              child: Text(option),
+            );
+          }).toList(),
         ),
       ]),
       floatingActionButton: FloatingActionButton(

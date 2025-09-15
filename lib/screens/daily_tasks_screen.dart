@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:my_app/database/database.dart';
+import 'package:my_app/model/project.dart';
 import 'package:my_app/model/task.dart';
 import 'package:my_app/screens/daily_screen.dart';
+import 'package:my_app/notification/notifications.dart';
 
 class TaskScreen extends StatefulWidget {
   const TaskScreen({super.key, required this.date});
@@ -15,12 +17,15 @@ class TaskScreen extends StatefulWidget {
 
 class _TaskScreenState extends State<TaskScreen> {
   final dbHelper = DatabaseHelper();
+  final notification = Notifications();
   List<Task> _tasks = [];
+  List<Project> _projects = [];
 
   @override
   void initState() {
     super.initState();
     _loadTasks();
+    _loadProjects();
   }
 
   Future<void> _loadTasks() async {
@@ -28,12 +33,26 @@ class _TaskScreenState extends State<TaskScreen> {
     setState(() => _tasks = tasks);
   }
 
+  Future<void> _loadProjects() async {
+    final projects = await dbHelper.getAllProjects();
+    setState(() => _projects = projects);
+  }
+
   void addTask(Task task) {
     dbHelper.insertTask(task);
+    scheduleNotification(task);
+    _loadTasks();
   }
 
   void updateTask(Task task) {
     dbHelper.updateTask(task);
+    _loadTasks();
+  }
+
+  scheduleNotification(Task task) {
+    notification.scheduleNotificationForTask(task);
+    notification.showNotification(
+        'Task Reminder', 'Reminder for task: ${task.taskName}');
   }
 
   Future<void> _deleteTask(String id) async {
@@ -51,6 +70,7 @@ class _TaskScreenState extends State<TaskScreen> {
           function: function,
           date: widget.date,
           adding: adding,
+          projects: _projects,
         ),
       ),
     );
@@ -72,6 +92,28 @@ class _TaskScreenState extends State<TaskScreen> {
                 return ListTile(
                   onTap: () => taskFormPage(context, updateTask, false),
                   title: Text(task.taskName),
+                  leading: Checkbox(
+                    tristate: true,
+                    value: task.status == 1
+                        ? true
+                        : task.status == 0
+                            ? false
+                            : null,
+                    onChanged: (bool? value) {
+                      setState(() {
+                        task.status = value == true
+                            ? 1
+                            : value == false
+                                ? 0
+                                : 2;
+                        notification.notificationsPlugin.cancel(int.parse(task
+                            .taskId
+                            .substring(0, 4)
+                            .replaceAll(RegExp(r'[^0-9]'), '')));
+                        dbHelper.updateTask(task);
+                      });
+                    },
+                  ),
                   subtitle: Row(
                     children: [
                       Text(
@@ -96,17 +138,19 @@ class _TaskScreenState extends State<TaskScreen> {
 class TaskForm extends StatefulWidget {
   final DatabaseHelper dbHelper;
   final Function(Task) function;
+  final List<Project> projects;
   final Task task;
   final DateTime date;
   final bool adding;
-  TaskForm(
-      {super.key,
-      required this.dbHelper,
-      required this.function,
-      required this.date,
-      required this.adding,
-      Task? task})
-      : task = task ?? Task();
+  TaskForm({
+    super.key,
+    required this.dbHelper,
+    required this.function,
+    required this.date,
+    required this.adding,
+    required this.projects,
+    Task? task,
+  }) : task = task ?? Task();
 
   @override
   State<TaskForm> createState() => _TaskFormState();
@@ -121,6 +165,9 @@ class _TaskFormState extends State<TaskForm> {
   late int status;
 
   final DateFormat _timeFormat = DateFormat('hh:mm a');
+
+  String? selectedValue;
+  List<String> options = [];
 
   @override
   void initState() {
@@ -143,6 +190,10 @@ class _TaskFormState extends State<TaskForm> {
       _endTime = widget.task.endTime;
       _reminderTime = widget.task.reminder;
       status = widget.task.status;
+    }
+
+    for (var project in widget.projects) {
+      options.add(project.projectName);
     }
   }
 
@@ -185,31 +236,44 @@ class _TaskFormState extends State<TaskForm> {
 
   addTask() {
     if (_controller.text.trim().isEmpty) return;
-    final task = Task(
-        taskName: _controller.text.trim(),
-        startTime: _startTime,
-        endTime: _endTime,
-        reminder: _reminderTime);
-    widget.function(task);
-    _controller.clear();
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => DailyScreen(
-          date: widget.date, initialTabIndex: 0
-        ),
-      ),
-    );
-  }
-
-  updateTask() {
+    Project selectedProject = Project(projectId: "default");
+    for (var option in options) {
+      if (selectedValue == option) {
+        selectedProject = widget.projects[options.indexOf(option)];
+      }
+    }
     final task = Task(
         taskName: _controller.text.trim(),
         startTime: _startTime,
         endTime: _endTime,
         reminder: _reminderTime,
-        status: status);
+        projectId: selectedProject.projectId);
+    widget.function(task);
+    _controller.clear();
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DailyScreen(date: widget.date, initialTabIndex: 0),
+      ),
+    );
+  }
+
+  updateTask() {
+    Project selectedProject = Project(projectId: "default");
+    for (var option in options) {
+      if (selectedValue == option) {
+        selectedProject = widget.projects[options.indexOf(option)];
+      }
+    }
+    final task = Task(
+      taskName: _controller.text.trim(),
+      startTime: _startTime,
+      endTime: _endTime,
+      reminder: _reminderTime,
+      status: status,
+      projectId: selectedProject.projectId,
+    );
     widget.function(task);
     _controller.clear();
 
@@ -217,7 +281,8 @@ class _TaskFormState extends State<TaskForm> {
       context,
       MaterialPageRoute(
         builder: (_) => DailyScreen(
-          date: widget.date, initialTabIndex: 0,
+          date: widget.date,
+          initialTabIndex: 0,
         ),
       ),
     );
@@ -288,6 +353,21 @@ class _TaskFormState extends State<TaskForm> {
               ),
             ),
           ),
+          DropdownButton<String>(
+            hint: const Text('Choose'),
+            value: selectedValue,
+            onChanged: (newValue) {
+              setState(() {
+                selectedValue = newValue;
+              });
+            },
+            items: options.map((option) {
+              return DropdownMenuItem<String>(
+                value: option,
+                child: Text(option),
+              );
+            }).toList(),
+          ),
           widget.adding
               ? ElevatedButton(
                   onPressed: addTask,
@@ -295,7 +375,7 @@ class _TaskFormState extends State<TaskForm> {
                 )
               : Column(
                   children: [
-                    statusSlider(status.toDouble()),
+                    //statusSlider(status.toDouble()),
                     ElevatedButton(
                       onPressed: updateTask,
                       child: const Text('update Task'),

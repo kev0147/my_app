@@ -1,3 +1,4 @@
+import 'package:my_app/model/project.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:my_app/model/note.dart';
@@ -34,6 +35,18 @@ class DatabaseHelper {
   // Create the tables
   Future<void> _createDB(Database db, int version) async {
     await db.execute('''
+      CREATE TABLE projects (
+        projectId TEXT PRIMARY KEY,
+        projectName TEXT,
+        status INTEGER
+      )
+    ''');
+
+    await db.execute('''
+      INSERT INTO projects (projectId, projectName, status) VALUES ('default', 'No Project', 0)
+    ''');
+
+    await db.execute('''
       CREATE TABLE tasks(
         taskId TEXT PRIMARY KEY,
         taskName TEXT,
@@ -51,7 +64,9 @@ class DatabaseHelper {
         transactionId TEXT PRIMARY KEY,
         transactionTime TEXT,
         transactionReason TEXT,
-        amount INTEGER
+        amount INTEGER,
+        projectId TEXT,
+        FOREIGN KEY (projectId) REFERENCES project(projectId) ON DELETE SET NULL
       )
     ''');
 
@@ -61,17 +76,43 @@ class DatabaseHelper {
         noteTime TEXT,
         noteTitle TEXT,
         note TEXT,
-        description TEXT
+        description TEXT,
+        projectId TEXT,
+        FOREIGN KEY (projectId) REFERENCES project(projectId) ON DELETE SET NULL
       )
     ''');
+  }
 
-    await db.execute('''
-      CREATE TABLE project (
-        projectId TEXT PRIMARY KEY,
-        projectName TEXT,
-        status INTEGER
-      )
-    ''');
+  //--------------------Project CRUD ------------------------
+  Future<int> insertProject(Project project) async {
+    final db = await database;
+    return await db.insert('projects', project.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<List<Project>> getAllProjects() async {
+    final db = await database;
+    final maps = await db.query('projects');
+    return List.generate(maps.length, (i) => Project.fromMap(maps[i]));
+  }
+
+  Future<Project> getProject(String projectId) async {
+    final db = await database;
+    final maps = await db
+        .query('projects', where: 'projectId = ?', whereArgs: [projectId]);
+    return List.generate(maps.length, (p) => Project.fromMap(maps[0]))[0];
+  }
+
+  Future<int> updateProject(Project project) async {
+    final db = await database;
+    return await db.update('projects', project.toMap(),
+        where: 'projectId = ?', whereArgs: [project.projectId]);
+  }
+
+  Future<int> deleteProject(String projectId) async {
+    final db = await database;
+    return await db
+        .delete('projects', where: 'projectId = ?', whereArgs: [projectId]);
   }
 
   // ---------------------- Task CRUD ----------------------
@@ -97,6 +138,16 @@ class DatabaseHelper {
             task.startTime.year == date.year &&
             task.startTime.month == date.month &&
             task.startTime.day == date.day)
+        .toList();
+  }
+
+    Future<List<Task>> getTasksOfProject(String projectId) async {
+    final db = await database;
+    final maps = await db.query('tasks');
+    return maps
+        .map((map) => Task.fromMap(map))
+        .where((task) =>
+            task.projectId == projectId)
         .toList();
   }
 
@@ -136,6 +187,16 @@ class DatabaseHelper {
             transaction.transactionTime.day == date.day)
         .toList();
   }
+
+   /* Future<List<tx.Transaction>> getTransactionsOfProject(String projectId) async {
+    final db = await database;
+    final maps = await db.query('transactions');
+    return maps
+        .map((transaction) => tx.Transaction.fromMap(transaction))
+        .where((transaction) =>
+            transaction.projectId ==  projectId)
+        .toList();
+  }*/
 
   Future<int> getMoneyPointOfTheDay(DateTime date) async {
     final db = await database;

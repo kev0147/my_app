@@ -1,6 +1,7 @@
 import 'package:my_app/screens/daily_tasks_screen.dart';
 import 'package:my_app/screens/daily_transactions_screen.dart';
 import 'package:my_app/screens/daily_notes_screen.dart';
+import 'package:my_app/screens/projects_screen.dart';
 import 'package:my_app/screens/tasks_screen.dart' as tasks;
 import 'package:my_app/screens/transactions_screen.dart' as tx;
 import 'package:my_app/screens/notes_screen.dart' as notes;
@@ -12,7 +13,7 @@ import 'package:my_app/screens/month_screen.dart';
 
 class DailyScreen extends StatefulWidget {
   const DailyScreen({super.key, required this.date, initialTabIndex})
-    :initialTabIndex = initialTabIndex ?? 0;
+      : initialTabIndex = initialTabIndex ?? 0;
 
   final DateTime date;
   final int initialTabIndex;
@@ -47,12 +48,20 @@ class _DailyScreenState extends State<DailyScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Tabs(formattedTime: _formattedTime, date: widget.date, initialTabIndex: widget.initialTabIndex,);
+    return Tabs(
+      formattedTime: _formattedTime,
+      date: widget.date,
+      initialTabIndex: widget.initialTabIndex,
+    );
   }
 }
 
 class Tabs extends StatelessWidget {
-  const Tabs({super.key, required String formattedTime, required this.date, required this.initialTabIndex })
+  const Tabs(
+      {super.key,
+      required String formattedTime,
+      required this.date,
+      required this.initialTabIndex})
       : _formattedTime = formattedTime;
 
   final String _formattedTime;
@@ -106,7 +115,15 @@ class Tabs extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>  notes.NoteScreen(),
+                      builder: (_) => notes.NoteScreen(),
+                    ),
+                  );
+                  break;
+                                  case 'projects':
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>  ProjectScreen(),
                     ),
                   );
                   break;
@@ -124,6 +141,10 @@ class Tabs extends StatelessWidget {
               const PopupMenuItem<String>(
                 value: 'notes',
                 child: Text('Notes'),
+              ),
+              const PopupMenuItem<String>(
+                value: 'projects',
+                child: Text('Categories'),
               ),
             ],
           ),

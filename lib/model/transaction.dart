@@ -1,3 +1,4 @@
+import 'package:my_app/model/project.dart';
 import 'package:uuid/uuid.dart';
 
 class Transaction {
@@ -6,13 +7,17 @@ class Transaction {
     DateTime? transactionTime,
     this.transactionReason = '',
     this.amount = 0,
+    String? projectId,
   })  : transactionId = transactionId ?? const Uuid().v4(),
-        transactionTime = transactionTime ?? DateTime.now();
+        transactionTime = transactionTime ?? DateTime.now(),
+        projectId = projectId ?? "default";
 
   String transactionId;
   DateTime transactionTime;
   String transactionReason;
   int amount;
+  Project? project;
+  String? projectId;
 
   Map<String, dynamic> toMap() {
     return {
@@ -20,6 +25,7 @@ class Transaction {
       'transactionTime': transactionTime.toIso8601String(),
       'transactionReason': transactionReason,
       'amount': amount,
+      'projectId': project?.projectId,
     };
   }
 
@@ -29,6 +35,7 @@ class Transaction {
       transactionTime: DateTime.parse(map['transactionTime']),
       transactionReason: map['transactionReason'],
       amount: map['amount'],
+      projectId: map['projectId'],
     );
   }
 }

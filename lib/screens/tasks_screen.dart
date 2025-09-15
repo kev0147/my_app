@@ -33,6 +33,7 @@ class _TaskScreenState extends State<TaskScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(title: const Text('Tasks')),
       body: _tasks.isEmpty
           ? const Center(child: Text('No task yet.'))
           : ListView.builder(
@@ -43,11 +44,29 @@ class _TaskScreenState extends State<TaskScreen> {
                 return ListTile(
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  leading: Icon(
+                  /*leading: Icon(
                     task.status == 1
                         ? Icons.check_circle
                         : Icons.radio_button_unchecked,
                     color: task.status == 1 ? Colors.green : Colors.grey,
+                  ),*/
+                  leading: Checkbox(
+                    tristate: true,
+                    value: task.status == 1
+                        ? true
+                        : task.status == 0
+                            ? false
+                            : null,
+                    onChanged: (bool? value) {
+                      setState(() {
+                        task.status = value == true
+                            ? 1
+                            : value == false
+                                ? 0
+                                : 2;
+                        dbHelper.updateTask(task);
+                      });
+                    },
                   ),
                   title: Text(
                     task.taskName,
@@ -57,7 +76,8 @@ class _TaskScreenState extends State<TaskScreen> {
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('date: ${DateFormat.yMMMMd().format(task.startTime)}'),
+                      Text(
+                          'date: ${DateFormat.yMMMMd().format(task.startTime)}'),
                       Text(
                           'Start:    ${DateFormat.Hm().format(task.startTime)}'),
                       Text('End:      ${DateFormat.Hm().format(task.endTime)}'),
